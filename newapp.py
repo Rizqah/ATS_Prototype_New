@@ -43,35 +43,83 @@ def login_mock():
 # APPLICANT LIST FEEDBACK HELPER
 # ==============================
 
-def generate_applicant_list_feedback(job_description: str, cleaned_resume: str) -> str:
+def generate_rejection_email(job_description: str, cleaned_resume: str, candidate_name: str = "the candidate") -> str:
     """
-    Generates structured, list-based feedback for the applicant.
+    Generates a fully formatted, legally compliant rejection email
+    based on JD + cleaned resume content.
+    """
+    
+    system_prompt = """
+    You are an Expert Resume Consultant and Compliance Officer. 
+    Your job is to generate a *polite, professional rejection email* that is fully legally compliant.
+
+    ⚠️ Your output MUST ALWAYS be a COMPLETE EMAIL.  
+    ⚠️ NOT a list.  
+    ⚠️ NOT bullet points alone.  
+    ⚠️ NOT freeform commentary.  
+    Only a polished email with the structure below.
+
+    ------------------------------------------
+    EMAIL FORMAT (YOU MUST FOLLOW THIS EXACTLY)
+    ------------------------------------------
+
+    Subject: Feedback on Your Application
+
+    Hi [Candidate Name],
+
+    Thank the candidate sincerely for applying.  
+    Explain that after reviewing their application in relation to the job description, 
+    the company will not be moving forward.  
+    Keep the tone neutral, factual, and professional.
+
+    Then provide TWO SECTIONS:
+
+    ### 🔎 Key Areas of Alignment
+    • 2–3 bullet points listing the candidate’s strengths that *directly match the job description*.
+
+    ### 🎯 Key Areas to Strengthen
+    • 5–7 bullet points describing hard-skill or experience gaps that prevented progression.
+    • Reference only skills, tools, systems, technical depth, demonstrated experience, 
+      or missing measurable outcomes.
+    • Be specific, factual, and based ONLY on the resume + job description.
+
+    Closing paragraph:
+    Thank them again for their interest.  
+    Wish them success in their job search.  
+    Sign off as “HR Team”.
+
+    ------------------------------------------
+    LEGAL COMPLIANCE RULES (MANDATORY)
+    ------------------------------------------
+    - DO NOT mention personality, attitude, soft skills, or cultural fit.
+    - DO NOT reference protected traits (gender, age, race, health, etc).
+    - DO NOT speculate about ability or experience.
+    - ONLY refer to job-related, demonstrable hard skills or experience.
     """
 
-    system_prompt = (
-        "You are an Expert ATS Consultant providing direct, objective, and actionable feedback "
-        "to a job applicant. Based ONLY on the provided Job Description and Resume content, "
-        "generate a concise, two-section Markdown list. "
-        "Section 1: '### 🚀 Top 3 Strengths (Alignment)' "
-        "Section 2: '### 🎯 Top 3 Areas for Improvement (Gaps)' "
-        "Focus strictly on hard skills, tools, and quantifiable experience that are either well aligned "
-        "or missing/weakly stated in the resume. Provide bullet points under each section."
-    )
+    user_prompt = f"""
+    Candidate Name: {candidate_name}
 
-    user_prompt = (
-        f"Job Description:\n---\n{job_description}\n---\n"
-        f"Cleaned Resume Content:\n---\n{cleaned_resume}"
-    )
+    Job Description:
+    {job_description}
+
+    Cleaned Resume:
+    {cleaned_resume}
+
+    Write the rejection email following the exact required format.
+    """
 
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+            {"role": "user", "content": user_prompt}
         ],
-        temperature=0.3,
+        temperature=0.0  # deterministic, consistent output
     )
+
     return response.choices[0].message.content
+
 
 
 # ==============================
@@ -260,29 +308,40 @@ if role == "Recruiter":
             ranking_results = st.session_state["ranked_data"]
             job_description = st.session_state["job_description"]
 
+            # Lowest ranking candidate
             candidate_to_reject = ranking_results[-1]
 
+            # Extract name without file extension
+            candidate_name = (
+                candidate_to_reject["name"]
+                .replace(".pdf", "")
+                .replace(".docx", "")
+                .replace(".doc", "")
+            )
+
             st.info(
-                f"Targeting **{candidate_to_reject['name']}** "
+                f"Targeting **{candidate_name}** "
                 f"(Lowest Score: {(candidate_to_reject['score'] * 100):.1f}%) for compliant feedback."
             )
 
-            if st.button(f"✍️ Draft Email for {candidate_to_reject['name']}"):
-                with st.spinner("Generating tangible, legally compliant draft..."):
-                    feedback_draft = generate_compliant_feedback(
-                        job_description,
-                        candidate_to_reject["resume"],
+            if st.button(f"✍️ Generate Rejection Email for {candidate_name}"):
+                with st.spinner("Generating compliant, hard-skill-based email..."):
+                    feedback_draft = generate_rejection_email(
+                        job_description=job_description,
+                        cleaned_resume=candidate_to_reject["resume"],
+                        candidate_name=candidate_name,
                     )
 
-                st.subheader("Final Draft (Recruiter Review Required)")
+                st.subheader("📧 Draft Email (Review Required)")
                 st.code(feedback_draft, language="text")
 
-                if st.checkbox("Recruiter Review: I confirm this feedback is safe and accurate."):
-                    st.success("✅ Email ready to send! Legal risk minimized.")
+                if st.checkbox("I confirm this feedback is legally safe and accurate."):
+                    st.success("✅ Email approved and ready to send.")
+
                     st.download_button(
-                        label="Download Draft",
+                        label="📩 Download Email Draft",
                         data=feedback_draft,
-                        file_name=f"Rejection_Email_{candidate_to_reject['name'].replace('.', '_')}.txt",
+                        file_name=f"Rejection_Email_{candidate_name}.txt",
                         mime="text/plain",
                     )
         else:
@@ -349,7 +408,7 @@ elif role == "Applicant":
         with st.spinner("Analysing your resume and generating improvements..."):
             cleaned_resume = clean_and_structure_resume(raw_resume)
             score = compute_fit_score(jd_applicant, cleaned_resume)
-            applicant_feedback_list = generate_applicant_list_feedback(jd_applicant, cleaned_resume)
+           #--- applicant_feedback_list = generate_applicant_list_feedback(jd_applicant, cleaned_resume)----
             optimised_resume_md = rewrite_resume(jd_applicant, cleaned_resume)
 
         st.success("Analysis complete! Scroll down to see your results.")
