@@ -351,11 +351,12 @@ if role == "Recruiter":
 # ====================================================
 # APPLICANT MODE
 # ====================================================
-
 elif role == "Applicant":
+    st.subheader("Applicant Dashboard – Check Fit, Get Feedback & Improve Resume")
+
     st.markdown(
         "Upload your resume and paste the job description to get your ATS fit score, "
-        "a list of actionable improvements, and a suggested AI-optimised resume version."
+        "a list of actionable improvements, and an AI-optimised resume."
     )
 
     col1, col2 = st.columns(2)
@@ -384,61 +385,58 @@ elif role == "Applicant":
     analyze_button = st.button("🔍 Analyse & Improve My Resume", type="primary")
 
     if analyze_button:
+
         if not jd_applicant:
             st.error("Please paste the Job Description first.")
             st.stop()
 
-        # Extract resume text
-        raw_resume = ""
+        # --- Extract resume ---
         if resume_file is not None:
-            filename = resume_file.name.lower()
-            if filename.endswith(".pdf"):
+            name = resume_file.name.lower()
+            if name.endswith(".pdf"):
                 raw_resume = extract_text_from_pdf(resume_file)
-            elif filename.endswith(".docx") or filename.endswith(".doc"):
+            elif name.endswith(".docx"):
                 raw_resume = extract_text_from_docx(resume_file)
             else:
-                st.error("Unsupported file type. Please upload a PDF, DOCX, or DOC file.")
+                st.error("Unsupported file type. Upload PDF or DOCX.")
                 st.stop()
         elif manual_resume_text.strip():
             raw_resume = manual_resume_text.strip()
         else:
-            st.error("Please upload a resume (PDF/DOCX/DOC) or paste your resume text.")
+            st.error("Please upload a resume file or paste text.")
             st.stop()
 
-        with st.spinner("Analysing your resume and generating improvements..."):
+        # --- Processing ---
+        with st.spinner("Analysing your resume and generating feedback..."):
+
             cleaned_resume = clean_and_structure_resume(raw_resume)
             score = compute_fit_score(jd_applicant, cleaned_resume)
-           #--- applicant_feedback_list = generate_applicant_list_feedback(jd_applicant, cleaned_resume)----
+            applicant_feedback_list = generate_applicant_list_feedback(jd_applicant, cleaned_resume)
             optimised_resume_md = rewrite_resume(jd_applicant, cleaned_resume)
 
-        st.success("Analysis complete! Scroll down to see your results.")
+        # --- OUTPUT (NOW SAFE — inside analyze_button block) ---
+        st.success("Analysis complete! Scroll down to view results.")
 
-        # 1. ATS Fit Score
+        # Fit score
         st.header("1. ATS Fit Score")
         score_percent = max(0.0, min(1.0, score)) * 100
+
         col_a, col_b = st.columns([1, 3])
         with col_a:
-            st.metric("Overall Match", f"{score_percent:.1f}%")
+            st.metric("Match Score", f"{score_percent:.1f}%")
         with col_b:
-            st.progress(score_percent / 100.0)
+            st.progress(score_percent / 100)
 
-        st.caption(
-            "This score is based on how closely your resume aligns with the job description using AI embeddings."
-        )
+        st.caption("This score reflects the similarity between your resume and the job description.")
 
-        # 2. Actionable Feedback List
-        st.header("2. Actionable Feedback List")
-        st.markdown(
-            "Use these objective, skill-based points to quickly edit and improve your resume's alignment."
-        )
+        # Feedback
+        st.header("2. Actionable Feedback")
+        st.markdown("Use the points below to improve your resume alignment:")
         st.markdown(applicant_feedback_list)
 
-        # 3. Suggested Optimised Resume
-        st.header("3. Suggested Optimised Resume")
-        st.markdown(
-            "This is an AI-enhanced version of your content focused on the key terms in the JD. "
-            "**Review and verify carefully before using.**"
-        )
+        # Optimised resume
+        st.header("3. AI-Optimised Resume")
+        st.markdown("Below is an improved version of your resume:")
         st.code(optimised_resume_md, language="markdown")
 
         st.download_button(
@@ -447,3 +445,4 @@ elif role == "Applicant":
             file_name="optimised_resume.md",
             mime="text/markdown",
         )
+
