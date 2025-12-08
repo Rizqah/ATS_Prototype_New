@@ -31,3 +31,10 @@
     8501
   ]
 }
+
+# Create/activate virtualenv if desired:
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install all project dependencies:
+pip install -r requirements.txt

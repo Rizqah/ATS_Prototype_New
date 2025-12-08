@@ -1,6 +1,9 @@
 import os
 import io
-from docx import Document
+try:
+    from docx import Document
+except Exception:
+    Document = None
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from pypdf import PdfReader
@@ -66,6 +69,11 @@ def extract_text_from_docx(uploaded_file):
     """Reads a Streamlit UploadedFile object and extracts text from DOCX."""
     # Ensure we read from the beginning
     uploaded_file.seek(0)
+    if Document is None:
+        raise RuntimeError(
+            "Missing dependency: python-docx. Install with 'pip install python-docx' "
+            "or add it to requirements.txt."
+        )
     doc = Document(uploaded_file)
     text = []
     for para in doc.paragraphs:
